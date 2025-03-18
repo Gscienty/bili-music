@@ -1,6 +1,8 @@
+use axum::body::Bytes;
+use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonContainerTrait, JsonValueTrait};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StreamAudioInfo {
     pub base_url: String,
     pub bandwidth: usize,
@@ -106,4 +108,21 @@ pub async fn audio_info(bvid: &str, cid: u64) -> Vec<StreamAudioInfo> {
     };
 
     audios.iter().map(StreamAudioInfo::new).collect()
+}
+
+pub async fn get_m4s_file_chunk(url: &str, range: (usize, usize)) -> Bytes {
+    reqwest::Client::default()
+        .request(reqwest::Method::GET, url)
+        .header(reqwest::header::USER_AGENT, "Mozilla")
+        .header(reqwest::header::REFERER, "https://www.bilibili.com")
+        .header(
+            reqwest::header::RANGE,
+            format!("bytes={}-{}", range.0, range.1),
+        )
+        .send()
+        .await
+        .unwrap()
+        .bytes()
+        .await
+        .unwrap()
 }
