@@ -3,20 +3,23 @@ use crate::{
     parsing::{ParseBox, utils},
 };
 
-pub const MVHD: u32 = utils::box_type_u32(['m', 'v', 'h', 'd']);
+pub const TKHD: u32 = utils::box_type_u32(['t', 'k', 'h', 'd']);
 #[derive(Debug)]
-pub struct MovieHeaderBox {
+pub struct TrackHeaderBox {
     creation_time: u64,
     modification_time: u64,
     timescale: u32,
     duration: u64,
-    rate: u32,
+
+    layer: u16,
+    alternate_group: u16,
     volume: u16,
     matrix: [u32; 9],
-    next_track_id: u32,
+    width: u32,
+    height: u32,
 }
 
-impl ParseBox for MovieHeaderBox {
+impl ParseBox for TrackHeaderBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
         typ: utils::BoxType,
@@ -27,6 +30,7 @@ impl ParseBox for MovieHeaderBox {
             let creation_time = stream.read_u64().await?;
             let modification_time = stream.read_u64().await?;
             let timescale = stream.read_u32().await?;
+            let _ = stream.read_u32().await?;
             let duration = stream.read_u64().await?;
 
             (creation_time, modification_time, timescale, duration)
@@ -34,25 +38,25 @@ impl ParseBox for MovieHeaderBox {
             let creation_time = stream.read_u32().await? as u64;
             let modification_time = stream.read_u32().await? as u64;
             let timescale = stream.read_u32().await?;
+            let _ = stream.read_u32().await?;
             let duration = stream.read_u32().await? as u64;
 
             (creation_time, modification_time, timescale, duration)
         };
 
-        let rate = stream.read_u32().await?;
-        let volume = stream.read_u16().await? >> 8;
-        let _ = stream.read_u16().await?;
         for _ in 0..2 {
             let _ = stream.read_u32().await?;
         }
+        let layer = stream.read_u16().await?;
+        let alternate_group = stream.read_u16().await?;
+        let volume = stream.read_u16().await? >> 8;
+        let _ = stream.read_u16().await?;
         let mut matrix = [0u32; 9];
         for value in matrix.each_mut() {
             *value = stream.read_u32().await?;
         }
-        for _ in 0..6 {
-            let _ = stream.read_u32().await?;
-        }
-        let next_track_id = stream.read_u32().await?;
+        let width = stream.read_u32().await?;
+        let height = stream.read_u32().await?;
 
         Ok(Self {
             creation_time,
@@ -60,10 +64,12 @@ impl ParseBox for MovieHeaderBox {
             timescale,
             duration,
 
-            rate,
+            layer,
+            alternate_group,
             volume,
             matrix,
-            next_track_id,
+            width,
+            height,
         })
     }
 }

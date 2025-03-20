@@ -71,4 +71,12 @@ where
 
         Ok((version, flag))
     }
+
+    pub async fn read_sample_header(&mut self) -> Result<u16, errors::Error> {
+        for _ in 0..6 {
+            let _ = self.read_u8().await?;
+        }
+        let data_reference_index = self.read_u16().await?;
+        Ok(data_reference_index)
+    }
 }

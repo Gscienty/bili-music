@@ -3,20 +3,18 @@ use crate::{
     parsing::{ParseBox, utils},
 };
 
-pub const MVHD: u32 = utils::box_type_u32(['m', 'v', 'h', 'd']);
+pub const MDHD: u32 = utils::box_type_u32(['m', 'd', 'h', 'd']);
 #[derive(Debug)]
-pub struct MovieHeaderBox {
+pub struct MediaHeaderBox {
     creation_time: u64,
     modification_time: u64,
     timescale: u32,
     duration: u64,
-    rate: u32,
-    volume: u16,
-    matrix: [u32; 9],
-    next_track_id: u32,
+
+    language: u16,
 }
 
-impl ParseBox for MovieHeaderBox {
+impl ParseBox for MediaHeaderBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
         typ: utils::BoxType,
@@ -39,31 +37,15 @@ impl ParseBox for MovieHeaderBox {
             (creation_time, modification_time, timescale, duration)
         };
 
-        let rate = stream.read_u32().await?;
-        let volume = stream.read_u16().await? >> 8;
+        let language = stream.read_u16().await?;
         let _ = stream.read_u16().await?;
-        for _ in 0..2 {
-            let _ = stream.read_u32().await?;
-        }
-        let mut matrix = [0u32; 9];
-        for value in matrix.each_mut() {
-            *value = stream.read_u32().await?;
-        }
-        for _ in 0..6 {
-            let _ = stream.read_u32().await?;
-        }
-        let next_track_id = stream.read_u32().await?;
 
         Ok(Self {
             creation_time,
             modification_time,
             timescale,
             duration,
-
-            rate,
-            volume,
-            matrix,
-            next_track_id,
+            language,
         })
     }
 }

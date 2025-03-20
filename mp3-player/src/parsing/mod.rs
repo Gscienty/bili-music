@@ -3,6 +3,7 @@ use mp4box::MP4Box;
 use crate::errors;
 
 pub mod container;
+pub mod descriptor;
 pub mod mp4box;
 pub mod spec;
 pub mod utils;
