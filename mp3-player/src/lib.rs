@@ -1,5 +1,5 @@
 use futures::TryStreamExt;
-use parsing::ParseContainerBox;
+use parsing::mp4box;
 
 mod bili_api;
 mod errors;
@@ -11,18 +11,33 @@ pub async fn run(bvid: &str) {
     let audio_info = bili_api::audio_info(bvid).await.unwrap();
     let audio = &audio_info.audios[0];
 
-    let stream = bili_api::fetch_m4s_chunk(&audio.base_url, audio.initialization)
+    let stream = bili_api::fetch_m4s_chunk(&audio.base_url, audio.index_range)
         .await
         .unwrap()
         .bytes_stream()
         .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
     let mut stream = parsing::utils::BoxStream(tokio_util::io::StreamReader::new(stream));
 
-    let _ = parsing::container::ContainerBox::<0>::parse(&mut stream, 0).await;
-    let _ = parsing::container::ContainerBox::<0>::parse(&mut stream, 0).await;
-    let _ = parsing::container::ContainerBox::<0>::parse(&mut stream, 0).await;
-    let result = parsing::container::ContainerBox::<0>::parse(&mut stream, 0).await;
-    loginfo(format!("{result:?}"));
+    let result = parsing::enter::parse_box(&mut stream).await.unwrap();
+    if let mp4box::MP4Box::CompressedSegmentIndex(segment_indices) = &result {
+        let range = segment_indices
+            .get_range(audio.data_start_offset(), 1)
+            .unwrap();
+
+        let stream = bili_api::fetch_m4s_chunk(&audio.base_url, range)
+            .await
+            .unwrap()
+            .bytes_stream()
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
+        let mut stream = parsing::utils::BoxStream(tokio_util::io::StreamReader::new(stream));
+
+        let _ = parsing::enter::parse_box(&mut stream).await;
+        let Ok(mp4box::MP4Box::MediaData(mdat)) = parsing::enter::parse_box(&mut stream).await
+        else {
+            return;
+        };
+        crate::loginfo(format!("{mdat:#?}"));
+    };
 }
 
 pub fn loginfo(log: String) {

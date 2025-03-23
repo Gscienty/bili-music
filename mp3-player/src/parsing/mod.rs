@@ -4,6 +4,7 @@ use crate::errors;
 
 pub mod container;
 pub mod descriptor;
+pub mod enter;
 pub mod mp4box;
 pub mod spec;
 pub mod utils;
@@ -33,17 +34,11 @@ pub trait ParseContainerBox<const TYP: u32>: CtorContainerBox {
     ) -> Result<Self, errors::Error> {
         let mut boxes = Vec::new();
 
-        if size == 0 {
+        while size > 0 {
             let (typ, box_size, hdr_size) = stream.read_box_common_header(size).await?;
             let child = Self::parse_child(stream, typ, box_size - hdr_size).await?;
             boxes.push(child);
-        } else {
-            while size > 0 {
-                let (typ, box_size, hdr_size) = stream.read_box_common_header(size).await?;
-                let child = Self::parse_child(stream, typ, box_size - hdr_size).await?;
-                boxes.push(child);
-                size -= box_size;
-            }
+            size -= box_size;
         }
 
         Self::ctor(boxes)

@@ -7,7 +7,9 @@ use super::audio_sample::{AudioSampleBox, MP4A};
 
 pub const STSD: u32 = utils::box_type_u32(['s', 't', 's', 'd']);
 #[derive(Debug)]
-pub struct SampleDescriptionBox {}
+pub struct SampleDescriptionBox {
+    entries: Vec<mp4box::MP4Box>,
+}
 
 impl SampleDescriptionBox {
     async fn parse_child(
@@ -37,12 +39,15 @@ impl ParseBox for SampleDescriptionBox {
         let _ = stream.read_box_version_flag_header().await?;
         let entry_count = stream.read_u32().await?;
         size -= 8;
+        let mut entries = Vec::new();
         for _ in 0..entry_count {
             let (typ, box_size, hdr_size) = stream.read_box_common_header(size).await?;
             let child = Self::parse_child(stream, typ, box_size - hdr_size).await?;
             size -= box_size;
+
+            entries.push(child);
         }
 
-        Ok(Self {})
+        Ok(Self { entries })
     }
 }

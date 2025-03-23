@@ -1,6 +1,10 @@
 use crate::{
     errors,
-    parsing::{ParseBox, mp4box, utils},
+    parsing::{
+        ParseBox, ParseContainerBox,
+        container::{ContainerBox, ILST},
+        mp4box, utils,
+    },
 };
 
 use super::hdlr::{HDLR, HandlerBox};
@@ -19,6 +23,7 @@ impl MetaBox {
     ) -> Result<mp4box::MP4Box, errors::Error> {
         let child = match typ.0 {
             HDLR => mp4box::MP4Box::Handler(HandlerBox::parse(stream, typ, size).await?),
+            ILST => mp4box::MP4Box::AppleListItem(ContainerBox::<ILST>::parse(stream, size).await?),
             _ => {
                 return Err(errors::Error::IOError(format!(
                     "unknown meta box type: {typ} {size}"
@@ -37,6 +42,7 @@ impl ParseBox for MetaBox {
         mut size: usize,
     ) -> Result<Self, errors::Error> {
         let _ = stream.read_box_version_flag_header().await?;
+        size -= 4;
 
         let mut boxes = Vec::new();
         while size > 0 {

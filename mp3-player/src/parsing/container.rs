@@ -3,6 +3,7 @@ use crate::errors;
 use super::{
     CtorContainerBox, ParseBox, ParseContainerBox, mp4box,
     spec::{
+        apple_data::{DESC, TOO, UTF8AppleDataBox},
         dref::{DREF, DataReferenceBox},
         elst::{ELST, EditListBox},
         free::{FREE, FreeSpaceBox},
@@ -11,17 +12,23 @@ use super::{
         mdhd::{MDHD, MediaHeaderBox},
         mehd::{MEHD, MovieExtendsHeaderBox},
         meta::{META, MetaBox},
+        mfhd::{MFHD, MovieFragmentHeaderBox},
         mvhd::{MVHD, MovieHeaderBox},
-        sgpd::SGPD,
+        sbgp::{SBGP, SampleToGroupBox},
+        sgpd::{SGPD, SampleGroupDescriptionBox},
+        sidx::{CompressedSegmentIndexBox, SIDX},
         smhd::{SMHD, SoundMediaHeaderBox},
         stco::{ChunkOffsetBox, STCO},
         stsc::{STSC, SampleToChunkBox},
         stsd::{STSD, SampleDescriptionBox},
         stsz::{STSZ, SampleSizeBox},
         stts::{STTS, TimeToSampleBox},
+        tfdt::{TFDT, TrackFragmentBaseMediaDecodeTimeBox},
+        tfhd::{TFHD, TrackFragmentHeaderBox},
         tkhd::{TKHD, TrackHeaderBox},
         trep::{TREP, TrackExtensionPropertiesBox},
         trex::{TREX, TrackExtendsBox},
+        trun::{TRUN, TrackRunBox},
     },
     utils,
 };
@@ -35,36 +42,18 @@ pub const DINF: u32 = utils::box_type_u32(['d', 'i', 'n', 'f']);
 pub const STBL: u32 = utils::box_type_u32(['s', 't', 'b', 'l']);
 pub const MVEX: u32 = utils::box_type_u32(['m', 'v', 'e', 'x']);
 pub const UDTA: u32 = utils::box_type_u32(['u', 'd', 't', 'a']);
+pub const ILST: u32 = utils::box_type_u32(['i', 'l', 's', 't']);
+pub const MOOF: u32 = utils::box_type_u32(['m', 'o', 'o', 'f']);
+pub const TRAF: u32 = utils::box_type_u32(['t', 'r', 'a', 'f']);
 
 #[derive(Debug)]
-pub struct ContainerBox<const TYP: u32> {}
-
-impl<const TYP: u32> CtorContainerBox for ContainerBox<TYP> {
-    fn ctor(_boxes: Vec<mp4box::MP4Box>) -> Result<Self, errors::Error> {
-        Ok(Self {})
-    }
+pub struct ContainerBox<const TYP: u32> {
+    pub(crate) boxes: Vec<mp4box::MP4Box>,
 }
 
-impl ParseContainerBox<0> for ContainerBox<0> {
-    async fn parse_child(
-        stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
-        typ: utils::BoxType,
-        size: usize,
-    ) -> Result<mp4box::MP4Box, errors::Error> {
-        let child = match typ.0 {
-            FTYP => mp4box::MP4Box::FileType(FileTypeBox::parse(stream, typ, size).await?),
-            FREE => mp4box::MP4Box::FreeSpace(FreeSpaceBox::parse(stream, typ, size).await?),
-            MOOV => {
-                mp4box::MP4Box::CompressedMovie(ContainerBox::<MOOV>::parse(stream, size).await?)
-            }
-            _ => {
-                return Err(errors::Error::IOError(format!(
-                    "unknown root box type: {typ}"
-                )));
-            }
-        };
-
-        Ok(child)
+impl<const TYP: u32> CtorContainerBox for ContainerBox<TYP> {
+    fn ctor(boxes: Vec<mp4box::MP4Box>) -> Result<Self, errors::Error> {
+        Ok(Self { boxes })
     }
 }
 
@@ -216,7 +205,7 @@ impl ParseContainerBox<STBL> for ContainerBox<STBL> {
             STSZ => mp4box::MP4Box::SampleSize(SampleSizeBox::parse(stream, typ, size).await?),
             STCO => mp4box::MP4Box::ChunkOffset(ChunkOffsetBox::parse(stream, typ, size).await?),
             SGPD => mp4box::MP4Box::SampleGroupDescription(
-                super::spec::sgpd::SampleGroupDescriptionBox::parse(stream, typ, size).await?,
+                SampleGroupDescriptionBox::parse(stream, typ, size).await?,
             ),
             _ => {
                 return Err(errors::Error::IOError(format!(
@@ -265,6 +254,77 @@ impl ParseContainerBox<UDTA> for ContainerBox<UDTA> {
             _ => {
                 return Err(errors::Error::IOError(format!(
                     "unknown udta box type: {typ}"
+                )));
+            }
+        };
+
+        Ok(child)
+    }
+}
+
+impl ParseContainerBox<ILST> for ContainerBox<ILST> {
+    async fn parse_child(
+        stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
+        typ: utils::BoxType,
+        size: usize,
+    ) -> Result<mp4box::MP4Box, errors::Error> {
+        let child = match typ.0 {
+            TOO | DESC => {
+                mp4box::MP4Box::UTF8AppleData(UTF8AppleDataBox::parse(stream, typ, size).await?)
+            }
+            _ => {
+                return Err(errors::Error::IOError(format!(
+                    "unknown ilst box type: {typ}"
+                )));
+            }
+        };
+
+        Ok(child)
+    }
+}
+
+impl ParseContainerBox<MOOF> for ContainerBox<MOOF> {
+    async fn parse_child(
+        stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
+        typ: utils::BoxType,
+        size: usize,
+    ) -> Result<mp4box::MP4Box, errors::Error> {
+        let child = match typ.0 {
+            MFHD => mp4box::MP4Box::MovieFragmentHeader(
+                MovieFragmentHeaderBox::parse(stream, typ, size).await?,
+            ),
+            TRAF => mp4box::MP4Box::TrackFragment(ContainerBox::<TRAF>::parse(stream, size).await?),
+            _ => {
+                return Err(errors::Error::IOError(format!(
+                    "unknown moof box type: {typ}"
+                )));
+            }
+        };
+
+        Ok(child)
+    }
+}
+
+impl ParseContainerBox<TRAF> for ContainerBox<TRAF> {
+    async fn parse_child(
+        stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
+        typ: utils::BoxType,
+        size: usize,
+    ) -> Result<mp4box::MP4Box, errors::Error> {
+        let child = match typ.0 {
+            TFHD => mp4box::MP4Box::TrackFragmentHeader(
+                TrackFragmentHeaderBox::parse(stream, typ, size).await?,
+            ),
+            TFDT => mp4box::MP4Box::TrackFragmentBaseMediaDecodeTime(
+                TrackFragmentBaseMediaDecodeTimeBox::parse(stream, typ, size).await?,
+            ),
+            SBGP => {
+                mp4box::MP4Box::SampleToGroup(SampleToGroupBox::parse(stream, typ, size).await?)
+            }
+            TRUN => mp4box::MP4Box::TrackRun(TrackRunBox::parse(stream, typ, size).await?),
+            _ => {
+                return Err(errors::Error::IOError(format!(
+                    "unknown traf box type: {typ}"
                 )));
             }
         };

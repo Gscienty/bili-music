@@ -61,3 +61,9 @@ pub async fn fetch_m4s_chunk(
 
     Ok(resp)
 }
+
+impl StreamAudioInfo {
+    pub const fn data_start_offset(&self) -> usize {
+        self.index_range.1
+    }
+}

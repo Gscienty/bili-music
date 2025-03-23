@@ -1,6 +1,7 @@
 use super::container;
 
-use super::container::{DINF, EDTS, MDIA, MINF, MOOV, MVEX, STBL, TRAK, UDTA};
+use super::container::{DINF, EDTS, ILST, MDIA, MINF, MOOF, MOOV, MVEX, STBL, TRAF, TRAK, UDTA};
+use super::spec::apple_data::UTF8AppleDataBox;
 use super::spec::audio_sample::AudioSampleBox;
 use super::spec::dref::DataReferenceBox;
 use super::spec::elst::EditListBox;
@@ -8,20 +9,27 @@ use super::spec::esds::ElementaryStreamDescriptorBox;
 use super::spec::free::FreeSpaceBox;
 use super::spec::ftyp::FileTypeBox;
 use super::spec::hdlr::HandlerBox;
+use super::spec::mdat::MediaDataBox;
 use super::spec::mdhd::MediaHeaderBox;
 use super::spec::mehd::MovieExtendsHeaderBox;
 use super::spec::meta::MetaBox;
+use super::spec::mfhd::MovieFragmentHeaderBox;
 use super::spec::mvhd::MovieHeaderBox;
+use super::spec::sbgp::SampleToGroupBox;
 use super::spec::sgpd::SampleGroupDescriptionBox;
+use super::spec::sidx::CompressedSegmentIndexBox;
 use super::spec::smhd::SoundMediaHeaderBox;
 use super::spec::stco::ChunkOffsetBox;
 use super::spec::stsc::SampleToChunkBox;
 use super::spec::stsd::SampleDescriptionBox;
 use super::spec::stsz::SampleSizeBox;
 use super::spec::stts::TimeToSampleBox;
+use super::spec::tfdt::TrackFragmentBaseMediaDecodeTimeBox;
+use super::spec::tfhd::TrackFragmentHeaderBox;
 use super::spec::tkhd::TrackHeaderBox;
 use super::spec::trep::TrackExtensionPropertiesBox;
 use super::spec::trex::TrackExtendsBox;
+use super::spec::trun::TrackRunBox;
 use super::spec::url::DataEntryUrlBox;
 
 #[allow(unused)]
@@ -36,6 +44,9 @@ pub enum MP4Box {
     SampleTable(container::ContainerBox<STBL>),
     MovieExtends(container::ContainerBox<MVEX>),
     UserData(container::ContainerBox<UDTA>),
+    AppleListItem(container::ContainerBox<ILST>),
+    CompressedMovieFragment(container::ContainerBox<MOOF>),
+    TrackFragment(container::ContainerBox<TRAF>),
 
     FileType(FileTypeBox),
     FreeSpace(FreeSpaceBox),
@@ -57,6 +68,14 @@ pub enum MP4Box {
     ChunkOffset(ChunkOffsetBox),
     SampleGroupDescription(SampleGroupDescriptionBox),
     Meta(MetaBox),
+    UTF8AppleData(UTF8AppleDataBox),
+    CompressedSegmentIndex(CompressedSegmentIndexBox),
+    MovieFragmentHeader(MovieFragmentHeaderBox),
+    TrackFragmentHeader(TrackFragmentHeaderBox),
+    TrackFragmentBaseMediaDecodeTime(TrackFragmentBaseMediaDecodeTimeBox),
+    SampleToGroup(SampleToGroupBox),
+    TrackRun(TrackRunBox),
+    MediaData(MediaDataBox),
 
     AudioSample(AudioSampleBox),
     ElementaryStreamDescriptor(ElementaryStreamDescriptorBox),
