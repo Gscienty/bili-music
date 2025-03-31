@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use futures::io::Cursor;
 use tokio_util::bytes::Bytes;
 
@@ -7,28 +9,41 @@ use crate::{
 };
 
 pub const ESDS: u32 = utils::box_type_u32(['e', 's', 'd', 's']);
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ElementaryStreamDescriptorBox {
-    descriptor: MPEG4Descriptor,
+    descriptors: HashMap<u8, MPEG4Descriptor>,
 }
 
 impl ParseBox for ElementaryStreamDescriptorBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
         typ: utils::BoxType,
-        size: usize,
+        mut size: usize,
     ) -> Result<Self, errors::Error> {
-        let mut data = Vec::with_capacity(size);
-        for _ in 0..size {
-            data.push(stream.read_u8().await?);
+        let _ = stream.read_box_version_flag_header().await?;
+
+        let mut descriptors = HashMap::new();
+
+        size -= 4;
+        while size > 0 {
+            let tag = stream.read_u8().await?;
+            let mut byte_read = stream.read_u8().await?;
+            size -= 2;
+
+            let mut descriptor_size = 0usize;
+            while (byte_read & 0x80) != 0 {
+                descriptor_size = (descriptor_size << 7) + (byte_read & 0x7f) as usize;
+                byte_read = stream.read_u8().await?;
+                size -= 1;
+            }
+            descriptor_size = (descriptor_size << 7) + (byte_read & 0x7f) as usize;
+
+            let (descriptor, consumed_size) = MPEG4Descriptor::parse(stream, tag, size).await?;
+            size -= consumed_size;
+
+            descriptors.insert(tag, descriptor);
         }
 
-        let mut description_stream = utils::BoxStream(tokio_util::io::StreamReader::new(
-            tokio_stream::once(tokio::io::Result::Ok(Bytes::from_iter(data.into_iter()))),
-        ));
-
-        let descriptor = MPEG4Descriptor::parse(&mut description_stream).await?;
-
-        Ok(Self { descriptor })
+        Ok(Self { descriptors })
     }
 }

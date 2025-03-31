@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     errors,
     parsing::{ParseBox, mp4box, utils},
@@ -8,7 +10,19 @@ use super::audio_sample::{AudioSampleBox, MP4A};
 pub const STSD: u32 = utils::box_type_u32(['s', 't', 's', 'd']);
 #[derive(Debug)]
 pub struct SampleDescriptionBox {
-    entries: Vec<mp4box::MP4Box>,
+    entries: HashMap<utils::BoxType, mp4box::MP4Box>,
+}
+
+impl SampleDescriptionBox {
+    pub fn get_audio_codec(&self) -> Option<AudioSampleBox> {
+        let Some(mp4box::MP4Box::AudioSample(audio_sample)) =
+            self.entries.get(&utils::BoxType(MP4A))
+        else {
+            return None;
+        };
+
+        Some(audio_sample.clone())
+    }
 }
 
 impl SampleDescriptionBox {
@@ -39,13 +53,13 @@ impl ParseBox for SampleDescriptionBox {
         let _ = stream.read_box_version_flag_header().await?;
         let entry_count = stream.read_u32().await?;
         size -= 8;
-        let mut entries = Vec::new();
+        let mut entries = HashMap::new();
         for _ in 0..entry_count {
             let (typ, box_size, hdr_size) = stream.read_box_common_header(size).await?;
             let child = Self::parse_child(stream, typ, box_size - hdr_size).await?;
             size -= box_size;
 
-            entries.push(child);
+            entries.insert(typ, child);
         }
 
         Ok(Self { entries })

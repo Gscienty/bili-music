@@ -9,6 +9,12 @@ pub struct MediaDataBox {
     data: Vec<u8>,
 }
 
+impl From<MediaDataBox> for Vec<u8> {
+    fn from(value: MediaDataBox) -> Self {
+        value.data
+    }
+}
+
 impl ParseBox for MediaDataBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,

@@ -2,12 +2,15 @@ use mp4box::MP4Box;
 
 use crate::errors;
 
+mod enter;
+
 pub mod container;
 pub mod descriptor;
-pub mod enter;
 pub mod mp4box;
 pub mod spec;
 pub mod utils;
+
+pub use enter::parse_box;
 
 pub trait ParseBox: Sized {
     async fn parse(
@@ -18,7 +21,7 @@ pub trait ParseBox: Sized {
 }
 
 pub trait CtorContainerBox: Sized {
-    fn ctor(boxes: Vec<MP4Box>) -> Result<Self, errors::Error>;
+    fn ctor(boxes: Vec<(utils::BoxType, MP4Box)>) -> Result<Self, errors::Error>;
 }
 
 pub trait ParseContainerBox<const TYP: u32>: CtorContainerBox {
@@ -37,7 +40,7 @@ pub trait ParseContainerBox<const TYP: u32>: CtorContainerBox {
         while size > 0 {
             let (typ, box_size, hdr_size) = stream.read_box_common_header(size).await?;
             let child = Self::parse_child(stream, typ, box_size - hdr_size).await?;
-            boxes.push(child);
+            boxes.push((typ, child));
             size -= box_size;
         }
 

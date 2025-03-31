@@ -28,6 +28,14 @@ where
         Ok(result)
     }
 
+    pub async fn read_u24(&mut self) -> Result<u32, errors::Error> {
+        let b0 = self.0.read_u8().await?;
+        let b1 = self.0.read_u8().await?;
+        let b2 = self.0.read_u8().await?;
+
+        Ok(((b0 as u32) << 16) | ((b1 as u32) << 8) | (b2 as u32))
+    }
+
     pub async fn read_u32(&mut self) -> Result<u32, errors::Error> {
         let result = self.0.read_u32().await?;
 

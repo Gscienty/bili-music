@@ -1,6 +1,6 @@
 use std::fmt::{Display, Write};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct BoxType(pub u32);
 
 impl Display for BoxType {

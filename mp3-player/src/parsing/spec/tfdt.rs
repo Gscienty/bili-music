@@ -9,6 +9,12 @@ pub struct TrackFragmentBaseMediaDecodeTimeBox {
     base_media_decode_time: u64,
 }
 
+impl TrackFragmentBaseMediaDecodeTimeBox {
+    pub const fn get_base_media_decode_time(&self) -> u64 {
+        self.base_media_decode_time
+    }
+}
+
 impl ParseBox for TrackFragmentBaseMediaDecodeTimeBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,

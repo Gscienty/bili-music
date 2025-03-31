@@ -2,6 +2,7 @@
 #[derive(Debug)]
 pub enum Error {
     IOError(String),
+    InternalError(String),
 }
 
 impl From<reqwest_wasm::Error> for Error {

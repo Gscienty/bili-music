@@ -22,7 +22,15 @@ pub struct TrackFragmentHeaderBox {
     default_sample_flags: u32,
 }
 
-impl TrackFragmentHeaderBox {}
+impl TrackFragmentHeaderBox {
+    pub const fn get_track_id(&self) -> u32 {
+        self.track_id
+    }
+
+    pub const fn get_default_sample_duration(&self) -> u32 {
+        self.default_sample_duration
+    }
+}
 
 impl ParseBox for TrackFragmentHeaderBox {
     async fn parse(

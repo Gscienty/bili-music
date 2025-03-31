@@ -1,3 +1,5 @@
+use std::{collections::HashMap, hash::Hash};
+
 use crate::errors;
 
 use super::{
@@ -48,12 +50,23 @@ pub const TRAF: u32 = utils::box_type_u32(['t', 'r', 'a', 'f']);
 
 #[derive(Debug)]
 pub struct ContainerBox<const TYP: u32> {
-    pub(crate) boxes: Vec<mp4box::MP4Box>,
+    pub(crate) children: HashMap<utils::BoxType, mp4box::MP4Box>,
+}
+
+impl<const TYP: u32> ContainerBox<TYP> {
+    pub fn get(&self, typ: u32) -> Option<&mp4box::MP4Box> {
+        self.children.get(&utils::BoxType(typ))
+    }
 }
 
 impl<const TYP: u32> CtorContainerBox for ContainerBox<TYP> {
-    fn ctor(boxes: Vec<mp4box::MP4Box>) -> Result<Self, errors::Error> {
-        Ok(Self { boxes })
+    fn ctor(boxes: Vec<(utils::BoxType, mp4box::MP4Box)>) -> Result<Self, errors::Error> {
+        let mut children = HashMap::new();
+        for (typ, child) in boxes.into_iter() {
+            children.insert(typ, child);
+        }
+
+        Ok(Self { children })
     }
 }
 

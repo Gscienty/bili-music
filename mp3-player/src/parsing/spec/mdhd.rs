@@ -14,6 +14,12 @@ pub struct MediaHeaderBox {
     language: u16,
 }
 
+impl MediaHeaderBox {
+    pub const fn get_timescale(&self) -> u32 {
+        self.timescale
+    }
+}
+
 impl ParseBox for MediaHeaderBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,

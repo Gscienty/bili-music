@@ -1,4 +1,8 @@
-use crate::errors;
+use crate::{
+    errors,
+    parsing::{self, utils},
+};
+use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,8 +45,8 @@ pub async fn audio_info(bvid: &str) -> Result<GetVideoInfoResponse, errors::Erro
 pub async fn fetch_m4s_chunk(
     url: &str,
     range: (usize, usize),
-) -> Result<reqwest_wasm::Response, errors::Error> {
-    let resp = reqwest_wasm::Client::default()
+) -> Result<utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>, errors::Error> {
+    let stream = reqwest_wasm::Client::default()
         .request(
             reqwest_wasm::Method::POST,
             "http://localhost:8000/audio_chunk",
@@ -57,9 +61,13 @@ pub async fn fetch_m4s_chunk(
             .unwrap(),
         )
         .send()
-        .await?;
+        .await?
+        .bytes_stream()
+        .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
 
-    Ok(resp)
+    let stream = parsing::utils::BoxStream(tokio_util::io::StreamReader::new(stream));
+
+    Ok(stream)
 }
 
 impl StreamAudioInfo {

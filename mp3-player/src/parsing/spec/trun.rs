@@ -15,10 +15,21 @@ pub const TRUN: u32 = utils::box_type_u32(['t', 'r', 'u', 'n']);
 pub struct TrackRunBox {
     data_offset: u32,
     first_sample_flags: u32,
+    sample_count: usize,
     sample_duration: Vec<u32>,
     sample_size: Vec<u32>,
     sample_flags: Vec<u32>,
     sample_composition_time_offset: Vec<u32>,
+}
+
+impl TrackRunBox {
+    pub const fn get_sample_count(&self) -> usize {
+        self.sample_count
+    }
+
+    pub const fn get_data_offset(&self) -> u32 {
+        self.data_offset
+    }
 }
 
 impl ParseBox for TrackRunBox {
@@ -71,6 +82,7 @@ impl ParseBox for TrackRunBox {
         Ok(Self {
             data_offset,
             first_sample_flags,
+            sample_count,
             sample_duration,
             sample_size,
             sample_flags,
