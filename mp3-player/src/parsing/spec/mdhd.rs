@@ -8,16 +8,10 @@ pub const MDHD: u32 = utils::box_type_u32(['m', 'd', 'h', 'd']);
 pub struct MediaHeaderBox {
     creation_time: u64,
     modification_time: u64,
-    timescale: u32,
-    duration: u64,
+    pub(crate) timescale: u32,
+    pub(crate) duration: u64,
 
     language: u16,
-}
-
-impl MediaHeaderBox {
-    pub const fn get_timescale(&self) -> u32 {
-        self.timescale
-    }
 }
 
 impl ParseBox for MediaHeaderBox {

@@ -5,7 +5,6 @@ use crate::errors;
 mod enter;
 
 pub mod container;
-pub mod descriptor;
 pub mod mp4box;
 pub mod spec;
 pub mod utils;

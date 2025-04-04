@@ -6,9 +6,9 @@ use crate::{
 pub const FTYP: u32 = utils::box_type_u32(['f', 't', 'y', 'p']);
 #[derive(Debug)]
 pub struct FileTypeBox {
-    major_brand: utils::BoxType,
-    minor_version: u32,
-    compatible_brands: Vec<utils::BoxType>,
+    pub(crate) major_brand: utils::BoxType,
+    pub(crate) minor_version: u32,
+    pub(crate) compatible_brands: Vec<utils::BoxType>,
 }
 
 impl ParseBox for FileTypeBox {

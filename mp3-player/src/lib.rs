@@ -10,19 +10,29 @@ pub async fn run(bvid: &str) {
     let audio_info = bili_api::audio_info(bvid).await.unwrap();
     let audio = &audio_info.audios[0];
 
-    let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, audio.initialization)
+    let header = demux::header::MP4Header::parse(audio).await.unwrap();
+    let fragment = demux::fragment::MP4Fragment::parse(&header, audio, 0)
         .await
         .unwrap();
 
-    let _ = parsing::parse_box(&mut stream).await;
-    let init_data = demux::init::TrackInitData::parse(&mut stream)
-        .await
-        .unwrap();
+    let Some((sample, data)) = fragment.get_sample(0) else {
+        panic!("");
+    };
 
-    let fragment_set = demux::fragment::FragmentSet::init(audio).await.unwrap();
-    let fragment = fragment_set.get_fragment(0, &init_data).await.unwrap();
+    crate::loginfo(format!("{sample:?}, {data:?}"));
 
-    crate::loginfo(format!("{fragment:?}"));
+    // let _ = parsing::parse_box(&mut stream).await;
+    // let init_data = demux::init::TrackInitData::parse(&mut stream)
+    //     .await
+    //     .unwrap();
+    //
+    // let fragment_set = demux::fragment::FragmentSet::init(audio).await.unwrap();
+    // let fragment = fragment_set
+    //     .get_track_fragment(0, &init_data)
+    //     .await
+    //     .unwrap();
+
+    // crate::loginfo(format!("{fragment:?}"));
 
     //let buffer = Uint8Array::from(fragment.get_data()).buffer();
 

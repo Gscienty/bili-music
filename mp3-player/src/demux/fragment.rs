@@ -1,132 +1,116 @@
+use std::{iter::zip, u64};
+
+use futures::SinkExt;
+
 use crate::{
     bili_api::{self, StreamAudioInfo},
     errors,
     parsing::{
         self,
-        container::TRAF,
+        container::{ContainerBox, MOOF, TRAF},
         mp4box,
-        spec::{sidx::CompressedSegmentIndexBox, tfdt::TFDT, tfhd::TFHD, trun::TRUN},
-        utils,
+        spec::{tfdt::TFDT, tfhd::TFHD, trun::TRUN},
     },
 };
 
-use super::init::TrackInitData;
-
-pub struct FragmentSet {
-    data_start_offset: usize,
-    url: String,
-    segments_indices: CompressedSegmentIndexBox,
-}
+use super::{header::MP4Header, sample::MP4Sample};
 
 #[derive(Debug)]
-pub struct Fragment {
-    base_media_decode_time: u64,
-    sample_duration: u64,
-    duration: u64,
-    data_offset: u32,
-
+pub struct MP4Fragment {
+    samples: Vec<MP4Sample>,
     data: Vec<u8>,
 }
 
-impl FragmentSet {
-    pub async fn init(audio_info: &StreamAudioInfo) -> Result<Self, errors::Error> {
-        let mut stream = bili_api::fetch_m4s_chunk(&audio_info.base_url, audio_info.index_range)
-            .await
-            .unwrap();
+impl MP4Fragment {
+    pub async fn parse(
+        header: &MP4Header,
+        audio: &StreamAudioInfo,
+        index: usize,
+    ) -> Result<Self, errors::Error> {
+        let Some((fragment_range, _)) = header.get_reference(index) else {
+            return Err(errors::Error::IOError(format!(
+                "not found range, index: {index}"
+            )));
+        };
+        let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, fragment_range).await?;
 
-        let mp4box::MP4Box::CompressedSegmentIndex(segments_indices) =
+        let mp4box::MP4Box::CompressedMovieFragment(fragment) =
             parsing::parse_box(&mut stream).await?
         else {
-            return Err(errors::Error::IOError("want sidx".to_string()));
+            return Err(errors::Error::IOError("not found MOOF".to_string()));
         };
+        let samples = Self::parse_samples(header, &fragment)?;
 
-        Ok(Self {
-            data_start_offset: audio_info.data_start_offset(),
-            url: audio_info.base_url.to_owned(),
-            segments_indices,
-        })
+        let mp4box::MP4Box::MediaData(media_data) = parsing::parse_box(&mut stream).await? else {
+            return Err(errors::Error::IOError("not found MDAT".to_string()));
+        };
+        let data: Vec<u8> = media_data.into();
+
+        Ok(Self { samples, data })
     }
 
-    pub async fn get_fragment(
-        &self,
-        fragment_index: usize,
-        track: &TrackInitData,
-    ) -> Result<Fragment, errors::Error> {
-        let Some(range) = self
-            .segments_indices
-            .get_range(self.data_start_offset, fragment_index)
-        else {
-            return Err(errors::Error::IOError(
-                "out of segments indices range".to_string(),
-            ));
-        };
-
-        let mut stream = bili_api::fetch_m4s_chunk(&self.url, range).await?;
-        Fragment::parse(&mut stream, track).await
-    }
-}
-
-impl Fragment {
-    pub fn get_data(&self) -> &[u8] {
-        &self.data
+    pub fn get_sample(&self, index: usize) -> Option<(&MP4Sample, &[u8])> {
+        self.samples
+            .get(index)
+            .map(|sample| (sample, &self.data[sample.range.0..sample.range.1]))
     }
 
-    async fn parse(
-        stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
-        track: &TrackInitData,
-    ) -> Result<Self, errors::Error> {
-        let mp4box::MP4Box::CompressedMovieFragment(moof) = parsing::parse_box(stream).await?
-        else {
-            return Err(errors::Error::IOError("want moof".to_string()));
+    fn parse_samples(
+        header: &MP4Header,
+        fragment: &ContainerBox<MOOF>,
+    ) -> Result<Vec<MP4Sample>, errors::Error> {
+        let Some(mp4box::MP4Box::TrackFragment(track_fragment)) = fragment.get(TRAF) else {
+            return Err(errors::Error::IOError("not found TRAF".to_string()));
         };
-        let Some(mp4box::MP4Box::TrackFragment(track_fragment)) = moof.get(TRAF) else {
-            return Err(errors::Error::IOError("cannot find traf".to_string()));
-        };
-        let Some(mp4box::MP4Box::TrackFragmentBaseMediaDecodeTime(base_media_decode_time)) =
-            track_fragment.get(TFDT)
-        else {
-            return Err(errors::Error::IOError("cannot find tfdt".to_string()));
-        };
-        let Some(mp4box::MP4Box::TrackFragmentHeader(track_fragment_header)) =
-            track_fragment.get(TFHD)
-        else {
-            return Err(errors::Error::IOError("cannot find tfhd".to_string()));
-        };
+        let base_start_time =
+            if let Some(mp4box::MP4Box::TrackFragmentBaseMediaDecodeTime(base_decode_time)) =
+                track_fragment.get(TFDT)
+            {
+                base_decode_time.get_base_media_decode_time()
+            } else {
+                0
+            };
+        let default_sample_duration =
+            if let Some(mp4box::MP4Box::TrackFragmentHeader(track_fragment_header)) =
+                track_fragment.get(TFHD)
+            {
+                let duration = track_fragment_header.get_default_sample_duration();
+                if duration != 0 {
+                    duration
+                } else {
+                    header.get_default_sample_duration()
+                }
+            } else {
+                header.get_default_sample_duration()
+            };
+
         let Some(mp4box::MP4Box::TrackRun(track_run)) = track_fragment.get(TRUN) else {
-            return Err(errors::Error::IOError("cannot find trun".to_string()));
+            return Err(errors::Error::IOError("not found TRUN".to_string()));
         };
 
-        let track_id = track_fragment_header.get_track_id();
-        if track_id != track.get_track_id() {
-            return Err(errors::Error::IOError(format!(
-                "track id not match: tfhd: {track_id}, init_data: {}",
-                track.get_track_id(),
-            )));
+        let mut sample_range = Vec::with_capacity(track_run.get_sample_count());
+        let mut offset = 0usize;
+        for &sample_size in track_run.get_sample_size().iter() {
+            sample_range.push((offset, offset + sample_size as usize));
+            offset += sample_size as usize;
         }
-        let default_sample_duration = track_fragment_header.get_default_sample_duration();
-        let sample_duration = if default_sample_duration == 0 {
-            track.get_duration()
+
+        let mut sample_time = Vec::with_capacity(track_run.get_sample_count());
+        let mut offset = 0u64;
+        if track_run.get_sample_duration().is_empty() {
+            for _ in 0..track_run.get_sample_count() {
+                sample_time.push((base_start_time + offset, default_sample_duration));
+                offset += default_sample_duration as u64;
+            }
         } else {
-            default_sample_duration as u64
-        };
-        crate::loginfo(format!("sample duration: {sample_duration}"));
-        let base_media_decode_time = base_media_decode_time.get_base_media_decode_time();
-        let sample_count = track_run.get_sample_count();
-        let data_offset = track_run.get_data_offset();
+            for &duration in track_run.get_sample_duration().iter() {
+                sample_time.push((base_start_time + offset, duration));
+                offset += duration as u64;
+            }
+        }
 
-        let mp4box::MP4Box::MediaData(mdat) = parsing::parse_box(stream).await? else {
-            return Err(errors::Error::IOError("want mdat".to_string()));
-        };
-
-        let timescale = track.get_timescale() as u64;
-
-        Ok(Self {
-            base_media_decode_time: base_media_decode_time / timescale,
-            sample_duration: sample_duration / timescale,
-            duration: (sample_duration * sample_count as u64) / timescale,
-            data_offset,
-
-            data: mdat.into(),
-        })
+        Ok(zip(sample_range, sample_time)
+            .map(|(range, (start_time, duration))| MP4Sample::new(start_time, duration, range))
+            .collect())
     }
 }

@@ -13,6 +13,12 @@ pub struct TrackExtendsBox {
     default_sample_flags: u32,
 }
 
+impl TrackExtendsBox {
+    pub const fn get_default_sample_duration(&self) -> u32 {
+        self.default_sample_duration
+    }
+}
+
 impl ParseBox for TrackExtendsBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,

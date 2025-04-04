@@ -80,7 +80,11 @@ impl ParseBox for CompressedSegmentIndexBox {
 }
 
 impl CompressedSegmentIndexBox {
-    pub fn get_range(&self, offset: usize, mut index: usize) -> Option<(usize, usize)> {
+    pub fn get_reference(
+        &self,
+        offset: usize,
+        mut index: usize,
+    ) -> Option<((usize, usize), &Reference)> {
         let mut begin = offset + self.first_offset as usize;
         let mut end = offset + self.first_offset as usize;
 
@@ -93,7 +97,7 @@ impl CompressedSegmentIndexBox {
             end = begin + reference.references_size as usize - 1;
 
             if index == 0 {
-                return Some((begin, end));
+                return Some(((begin, end), reference));
             }
             index -= 1;
         }

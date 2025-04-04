@@ -87,4 +87,12 @@ where
         let data_reference_index = self.read_u16().await?;
         Ok(data_reference_index)
     }
+
+    pub async fn skip_bytes(&mut self, bytes: usize) -> Result<(), errors::Error> {
+        for _ in 0..bytes {
+            self.0.read_u8().await?;
+        }
+
+        Ok(())
+    }
 }

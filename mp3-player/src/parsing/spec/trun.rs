@@ -30,6 +30,14 @@ impl TrackRunBox {
     pub const fn get_data_offset(&self) -> u32 {
         self.data_offset
     }
+
+    pub fn get_sample_size(&self) -> &[u32] {
+        &self.sample_size
+    }
+
+    pub fn get_sample_duration(&self) -> &[u32] {
+        &self.sample_duration
+    }
 }
 
 impl ParseBox for TrackRunBox {

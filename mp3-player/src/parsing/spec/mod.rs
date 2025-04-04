@@ -2,6 +2,7 @@ pub mod audio_sample;
 pub mod sample_groups;
 
 pub mod apple_data;
+pub mod descriptor;
 pub mod dref;
 pub mod elst;
 pub mod esds;
