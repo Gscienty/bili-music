@@ -14,7 +14,7 @@ pub struct SampleDescriptionBox {
 }
 
 impl SampleDescriptionBox {
-    pub fn get_audio_codec(&self) -> Option<AudioSampleBox> {
+    pub fn get_audio_sample(&self) -> Option<AudioSampleBox> {
         let Some(mp4box::MP4Box::AudioSample(audio_sample)) =
             self.entries.get(&utils::BoxType(MP4A))
         else {

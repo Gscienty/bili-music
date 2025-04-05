@@ -141,6 +141,10 @@ impl ESDescriptor {
             consumed_bytes,
         ))
     }
+
+    pub fn get_decoder_config(&self) -> &DecoderConfigDescriptor {
+        &self.decoder_config
+    }
 }
 
 impl DecoderConfigDescriptor {
@@ -196,6 +200,14 @@ impl DecoderConfigDescriptor {
             consumed_bytes,
         ))
     }
+
+    pub fn get_decoder_specific(&self) -> &DecoderSpecificInfo {
+        &self.decoder_specific
+    }
+
+    pub const fn get_avg_bitrate(&self) -> u32 {
+        self.avg_bitrate
+    }
 }
 
 impl DecoderSpecificInfo {
@@ -233,6 +245,18 @@ impl DecoderSpecificInfo {
                 stream.get_consumed_bytes(),
             ))
         }
+    }
+
+    pub const fn get_object_type(&self) -> u8 {
+        self.object_type
+    }
+
+    pub const fn get_sampling_frequency_index(&self) -> u32 {
+        self.sampling_frequency_index
+    }
+
+    pub const fn get_channel_configuration(&self) -> u8 {
+        self.channel_configuration
     }
 }
 

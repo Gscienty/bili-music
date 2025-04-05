@@ -47,6 +47,8 @@ tokio-util = { version = "0.7.14", features = [
   "io-util",
 ] }
 tokio-stream = "0.1.17"
+symphonia-codec-aac = "0.5.4"
+symphonia-core = "0.5.4"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

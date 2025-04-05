@@ -12,7 +12,7 @@ pub struct AudioSampleBox {
     channel_count: u16,
     sample_size: u16,
     sample_rate: u32,
-    footer: ElementaryStreamDescriptorBox,
+    elementary_stream_descriptor: ElementaryStreamDescriptorBox,
 }
 
 impl AudioSampleBox {
@@ -31,6 +31,10 @@ impl AudioSampleBox {
         };
 
         Ok(child)
+    }
+
+    pub fn get_elementary_stream_descriptor(&self) -> &ElementaryStreamDescriptorBox {
+        &self.elementary_stream_descriptor
     }
 }
 
@@ -60,7 +64,7 @@ impl ParseBox for AudioSampleBox {
             channel_count,
             sample_size,
             sample_rate,
-            footer,
+            elementary_stream_descriptor: footer,
         })
     }
 }

@@ -16,6 +16,12 @@ pub struct ElementaryStreamDescriptorBox {
     descriptor: descriptor::ESDescriptor,
 }
 
+impl ElementaryStreamDescriptorBox {
+    pub fn get_es_descriptor(&self) -> &descriptor::ESDescriptor {
+        &self.descriptor
+    }
+}
+
 impl ParseBox for ElementaryStreamDescriptorBox {
     async fn parse(
         stream: &mut utils::BoxStream<impl tokio::io::AsyncReadExt + Unpin>,
