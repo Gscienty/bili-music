@@ -1,4 +1,4 @@
-use std::{iter::zip, u64};
+use std::iter::zip;
 
 use futures::SinkExt;
 
@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{header::MP4Header, sample::MP4Sample};
+use super::{header::MP4Metadata, sample::MP4Sample};
 
 #[derive(Debug)]
 pub struct MP4Fragment {
@@ -23,16 +23,11 @@ pub struct MP4Fragment {
 
 impl MP4Fragment {
     pub async fn parse(
-        header: &MP4Header,
+        header: &MP4Metadata,
         audio: &StreamAudioInfo,
-        index: usize,
+        range: (usize, usize),
     ) -> Result<Self, errors::Error> {
-        let Some((fragment_range, _)) = header.get_reference(index) else {
-            return Err(errors::Error::IOError(format!(
-                "not found range, index: {index}"
-            )));
-        };
-        let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, fragment_range).await?;
+        let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, range).await?;
 
         let mp4box::MP4Box::CompressedMovieFragment(fragment) =
             parsing::parse_box(&mut stream).await?
@@ -56,7 +51,7 @@ impl MP4Fragment {
     }
 
     fn parse_samples(
-        header: &MP4Header,
+        header: &MP4Metadata,
         fragment: &ContainerBox<MOOF>,
     ) -> Result<Vec<MP4Sample>, errors::Error> {
         let Some(mp4box::MP4Box::TrackFragment(track_fragment)) = fragment.get(TRAF) else {

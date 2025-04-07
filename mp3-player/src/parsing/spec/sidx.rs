@@ -80,6 +80,18 @@ impl ParseBox for CompressedSegmentIndexBox {
 }
 
 impl CompressedSegmentIndexBox {
+    pub const fn get_timescale(&self) -> u64 {
+        self.timescale as u64
+    }
+
+    pub fn get_references(&self) -> &[Reference] {
+        &self.references
+    }
+
+    pub const fn get_first_offset(&self) -> usize {
+        self.first_offset as usize
+    }
+
     pub fn get_reference(
         &self,
         offset: usize,
@@ -107,5 +119,15 @@ impl CompressedSegmentIndexBox {
 
     pub fn count(&self) -> usize {
         self.references.len()
+    }
+}
+
+impl Reference {
+    pub const fn get_references_size(&self) -> usize {
+        self.references_size as usize
+    }
+
+    pub const fn get_subsegment_duration(&self) -> u64 {
+        self.subsegment_duration as u64
     }
 }

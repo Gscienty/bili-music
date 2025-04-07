@@ -22,7 +22,7 @@ use super::{
 };
 
 #[derive(Debug)]
-pub struct MP4Header {
+pub struct MP4Metadata {
     file_type: ftyp::FileTypeBox,
 
     default_sample_duration: u32,
@@ -34,11 +34,19 @@ pub struct MP4Header {
 
     data_start_offset: usize,
     url: String,
-    segments_indices: CompressedSegmentIndexBox,
+    segments: Vec<SegmentIndex>,
 }
 
-impl MP4Header {
-    pub async fn parse(audio: &StreamAudioInfo) -> Result<Self, errors::Error> {
+#[derive(Debug)]
+pub struct SegmentIndex {
+    pub(crate) data_range: (usize, usize),
+    pub(crate) time_range: (u64, u64),
+}
+
+impl MP4Metadata {
+    pub async fn parse(audio: &bili_api::StreamAudioInfo) -> Result<Self, errors::Error> {
+        let data_start_offset = audio.data_start_offset();
+
         let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, audio.initialization).await?;
 
         let mp4box::MP4Box::FileType(file_type) = parsing::parse_box(&mut stream).await? else {
@@ -97,6 +105,25 @@ impl MP4Header {
             return Err(errors::Error::IOError("want sidx".to_string()));
         };
 
+        let mut segments = Vec::with_capacity(segments_indices.count());
+        let mut data_offset = data_start_offset + segments_indices.get_first_offset();
+        let mut time_offset = 0;
+        for reference in segments_indices.get_references().iter() {
+            segments.push(SegmentIndex {
+                data_range: (
+                    data_offset + 1,
+                    data_offset + reference.get_references_size(),
+                ),
+                time_range: (
+                    time_offset,
+                    time_offset + reference.get_subsegment_duration(),
+                ),
+            });
+
+            data_offset += reference.get_references_size();
+            time_offset += reference.get_subsegment_duration();
+        }
+
         Ok(Self {
             file_type,
 
@@ -107,9 +134,9 @@ impl MP4Header {
 
             bitrate,
 
-            data_start_offset: audio.data_start_offset(),
+            data_start_offset,
             url: audio.base_url.to_owned(),
-            segments_indices,
+            segments,
         })
     }
 
@@ -125,9 +152,8 @@ impl MP4Header {
         self.file_type.compatible_brands.as_slice()
     }
 
-    pub fn get_reference(&self, index: usize) -> Option<((usize, usize), &Reference)> {
-        self.segments_indices
-            .get_reference(self.data_start_offset, index)
+    pub fn get_references(&self) -> &[SegmentIndex] {
+        &self.segments
     }
 
     pub const fn get_default_sample_duration(&self) -> u32 {
