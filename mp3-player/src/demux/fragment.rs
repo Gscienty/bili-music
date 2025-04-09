@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-use super::{header::MP4Metadata, sample::MP4Sample};
+use super::{metadata::MP4Metadata, sample::MP4Sample};
 
 #[derive(Debug)]
 pub struct MP4Fragment {
@@ -23,7 +23,7 @@ pub struct MP4Fragment {
 
 impl MP4Fragment {
     pub async fn parse(
-        header: &MP4Metadata,
+        metadata: &MP4Metadata,
         audio: &StreamAudioInfo,
         range: (usize, usize),
     ) -> Result<Self, errors::Error> {
@@ -34,7 +34,7 @@ impl MP4Fragment {
         else {
             return Err(errors::Error::IOError("not found MOOF".to_string()));
         };
-        let samples = Self::parse_samples(header, &fragment)?;
+        let samples = Self::parse_samples(metadata, &fragment)?;
 
         let mp4box::MP4Box::MediaData(media_data) = parsing::parse_box(&mut stream).await? else {
             return Err(errors::Error::IOError("not found MDAT".to_string()));
@@ -44,6 +44,14 @@ impl MP4Fragment {
         Ok(Self { samples, data })
     }
 
+    pub fn get_samples(&self) -> &[MP4Sample] {
+        &self.samples
+    }
+
+    pub fn get_sample_count(&self) -> usize {
+        self.samples.len()
+    }
+
     pub fn get_sample(&self, index: usize) -> Option<(&MP4Sample, &[u8])> {
         self.samples
             .get(index)
@@ -51,7 +59,7 @@ impl MP4Fragment {
     }
 
     fn parse_samples(
-        header: &MP4Metadata,
+        metadata: &MP4Metadata,
         fragment: &ContainerBox<MOOF>,
     ) -> Result<Vec<MP4Sample>, errors::Error> {
         let Some(mp4box::MP4Box::TrackFragment(track_fragment)) = fragment.get(TRAF) else {
@@ -73,10 +81,10 @@ impl MP4Fragment {
                 if duration != 0 {
                     duration
                 } else {
-                    header.get_default_sample_duration()
+                    metadata.get_default_sample_duration()
                 }
             } else {
-                header.get_default_sample_duration()
+                metadata.get_default_sample_duration()
             };
 
         let Some(mp4box::MP4Box::TrackRun(track_run)) = track_fragment.get(TRUN) else {

@@ -5,10 +5,13 @@
     <title>hello-wasm example</title>
   </head>
   <body>
+    <button id="btn">play</button>
     <script type="module">
       import init, { run } from "./pkg/mp3_player.js";
       init().then(async () => {
-        await run("BV1Vq4y1r74d");
+        document.getElementById("btn").addEventListener("click", async function() {
+          await run("BV1Vq4y1r74d");
+        });
       });
     </script>
   </body>
