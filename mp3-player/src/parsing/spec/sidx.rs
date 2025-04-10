@@ -92,31 +92,6 @@ impl CompressedSegmentIndexBox {
         self.first_offset as usize
     }
 
-    pub fn get_reference(
-        &self,
-        offset: usize,
-        mut index: usize,
-    ) -> Option<((usize, usize), &Reference)> {
-        let mut begin = offset + self.first_offset as usize;
-        let mut end = offset + self.first_offset as usize;
-
-        if index >= self.references.len() {
-            return None;
-        }
-
-        for reference in self.references.iter() {
-            begin = end + 1;
-            end = begin + reference.references_size as usize - 1;
-
-            if index == 0 {
-                return Some(((begin, end), reference));
-            }
-            index -= 1;
-        }
-
-        None
-    }
-
     pub fn count(&self) -> usize {
         self.references.len()
     }

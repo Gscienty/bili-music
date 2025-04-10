@@ -31,19 +31,24 @@ pub async fn run(bvid: &str) {
     // let mut samples = VecDeque::new();
     let mut left_samples = Vec::new();
     let mut right_samples = Vec::new();
-    for _ in 0..1000 {
-        let Some((sample_meta, data)) = prog.next_sample().await else {
-            crate::loginfo(format!("occur error {}", ""));
+    while let Some((sample_meta, data)) = prog.next_sample().await {
+        if sample_meta.duration != 1024 {
+            // TODO acc decode bug, duration must == 1024
             break;
-        };
+        }
         let packet = Packet::new_from_slice(0, 0, sample_meta.duration as u64, data);
 
         let result = decoder.decode(&packet).unwrap();
         let mut sample = SampleBuffer::<f32>::new(sample_meta.duration as u64, *result.spec());
         sample.copy_interleaved_ref(result);
 
-        left_samples.extend_from_slice(&sample.samples()[..1024]);
-        right_samples.extend_from_slice(&sample.samples()[1024..]);
+        for (index, &sample) in sample.samples().iter().enumerate() {
+            if index % 2 == 0 {
+                left_samples.push(sample);
+            } else {
+                right_samples.push(sample);
+            }
+        }
     }
     crate::loginfo("decoded".to_string());
 
@@ -56,6 +61,7 @@ pub async fn run(bvid: &str) {
     audio_buffer.copy_to_channel(&right_samples, 1).unwrap();
 
     let opt = GainOptions::new();
+    opt.set_gain(0.3);
     let gain = GainNode::new_with_options(&ctx, &opt).unwrap();
 
     let source = ctx.create_buffer_source().unwrap();
@@ -68,49 +74,6 @@ pub async fn run(bvid: &str) {
         .unwrap();
     let err = source.start().err();
     crate::loginfo(format!("{err:?}"));
-
-    // let _ = parsing::parse_box(&mut stream).await;
-    // let init_data = demux::init::TrackInitData::parse(&mut stream)
-    //     .await
-    //     .unwrap();
-    //
-    // let fragment_set = demux::fragment::FragmentSet::init(audio).await.unwrap();
-    // let fragment = fragment_set
-    //     .get_track_fragment(0, &init_data)
-    //     .await
-    //     .unwrap();
-
-    // crate::loginfo(format!("{fragment:?}"));
-
-    //let buffer = Uint8Array::from(fragment.get_data()).buffer();
-
-    // let stream = bili_api::fetch_m4s_chunk(&audio.base_url, audio.index_range)
-    //     .await
-    //     .unwrap()
-    //     .bytes_stream()
-    //     .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
-    // let mut stream = parsing::utils::BoxStream(tokio_util::io::StreamReader::new(stream));
-    //
-    // let result = parsing::enter::parse_box(&mut stream).await.unwrap();
-    // if let mp4box::MP4Box::CompressedSegmentIndex(segment_indices) = &result {
-    //     let range = segment_indices
-    //         .get_range(audio.data_start_offset(), 1)
-    //         .unwrap();
-    //
-    //     let stream = bili_api::fetch_m4s_chunk(&audio.base_url, range)
-    //         .await
-    //         .unwrap()
-    //         .bytes_stream()
-    //         .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err));
-    //     let mut stream = parsing::utils::BoxStream(tokio_util::io::StreamReader::new(stream));
-    //
-    //     let _ = parsing::enter::parse_box(&mut stream).await;
-    //     let Ok(mp4box::MP4Box::MediaData(mdat)) = parsing::enter::parse_box(&mut stream).await
-    //     else {
-    //         return;
-    //     };
-    //     crate::loginfo(format!("{mdat:#?}"));
-    // };
 }
 
 pub fn loginfo(log: String) {

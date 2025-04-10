@@ -152,7 +152,7 @@ impl MP4Metadata {
         self.file_type.compatible_brands.as_slice()
     }
 
-    pub fn get_references(&self) -> &[SegmentIndex] {
+    pub fn get_segments(&self) -> &[SegmentIndex] {
         &self.segments
     }
 

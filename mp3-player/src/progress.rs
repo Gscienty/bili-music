@@ -18,7 +18,6 @@ pub struct Progress {
 impl Progress {
     pub async fn new(audio: &StreamAudioInfo) -> Result<Self, errors::Error> {
         let metadata = demux::metadata::MP4Metadata::parse(audio).await?;
-        crate::loginfo(format!("{metadata:?}"));
         Ok(Self {
             audio: audio.clone(),
 
@@ -33,7 +32,7 @@ impl Progress {
     pub async fn reset_time(&mut self, enterpoint: u64) -> Result<(), errors::Error> {
         let fragment_index = self
             .metadata
-            .get_references()
+            .get_segments()
             .binary_search_by(|segment| {
                 if segment.time_range.0 <= enterpoint && enterpoint < segment.time_range.1 {
                     Ordering::Equal
@@ -76,8 +75,14 @@ impl Progress {
         }
         self.should_upgrade_fragment = false;
 
-        let Some(reference) = &self.metadata.get_references().get(self.fragment_index) else {
+        crate::loginfo(format!(
+            "| {} / {} |",
+            self.fragment_index + 1,
+            self.metadata.get_segments().len()
+        ));
+        let Some(reference) = &self.metadata.get_segments().get(self.fragment_index) else {
             self.fragment = None;
+
             return Err(errors::Error::InternalError(
                 "out of references limit".to_string(),
             ));
