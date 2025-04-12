@@ -1,5 +1,5 @@
 use crate::{
-    bili_api::{self, StreamAudioInfo},
+    bili_api::{self, AudioInfo},
     errors,
     parsing::{
         self,
@@ -44,7 +44,7 @@ pub struct SegmentIndex {
 }
 
 impl MP4Metadata {
-    pub async fn parse(audio: &bili_api::StreamAudioInfo) -> Result<Self, errors::Error> {
+    pub async fn parse(audio: &bili_api::AudioInfo) -> Result<Self, errors::Error> {
         let data_start_offset = audio.data_start_offset();
 
         let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, audio.initialization).await?;
@@ -166,5 +166,9 @@ impl MP4Metadata {
 
     pub const fn get_channel_configuration(&self) -> ChannelConfig {
         self.channel_config
+    }
+
+    pub const fn sample_rate(&self) -> u32 {
+        self.sampling_frequence_index.sample_rate()
     }
 }

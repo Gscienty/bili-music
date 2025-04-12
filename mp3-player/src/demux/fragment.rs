@@ -3,7 +3,7 @@ use std::iter::zip;
 use futures::SinkExt;
 
 use crate::{
-    bili_api::{self, StreamAudioInfo},
+    bili_api::{self, AudioInfo},
     errors,
     parsing::{
         self,
@@ -24,7 +24,7 @@ pub struct MP4Fragment {
 impl MP4Fragment {
     pub async fn parse(
         metadata: &MP4Metadata,
-        audio: &StreamAudioInfo,
+        audio: &AudioInfo,
         range: (usize, usize),
     ) -> Result<Self, errors::Error> {
         let mut stream = bili_api::fetch_m4s_chunk(&audio.base_url, range).await?;
@@ -56,6 +56,10 @@ impl MP4Fragment {
         self.samples
             .get(index)
             .map(|sample| (sample, &self.data[sample.range.0..sample.range.1]))
+    }
+
+    pub fn get_data(&self) -> &[u8] {
+        &self.data
     }
 
     fn parse_samples(

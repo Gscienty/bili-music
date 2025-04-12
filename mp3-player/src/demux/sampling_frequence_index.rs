@@ -40,3 +40,23 @@ impl TryFrom<u32> for SamplingFrequenceIndex {
         }
     }
 }
+
+impl SamplingFrequenceIndex {
+    pub const fn sample_rate(&self) -> u32 {
+        match *self {
+            Self::Freq96000 => 96000,
+            Self::Freq88200 => 88200,
+            Self::Freq64000 => 64000,
+            Self::Freq48000 => 48000,
+            Self::Freq44100 => 44100,
+            Self::Freq32000 => 32000,
+            Self::Freq24000 => 24000,
+            Self::Freq22050 => 22050,
+            Self::Freq16000 => 16000,
+            Self::Freq12000 => 12000,
+            Self::Freq11025 => 11025,
+            Self::Freq8000 => 8000,
+            Self::Freq7350 => 7350,
+        }
+    }
+}

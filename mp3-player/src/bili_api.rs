@@ -6,7 +6,7 @@ use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StreamAudioInfo {
+pub struct AudioInfo {
     pub base_url: String,
     pub bandwidth: usize,
     pub mime_type: String,
@@ -18,7 +18,7 @@ pub struct StreamAudioInfo {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetVideoInfoResponse {
     pub title: String,
-    pub audios: Vec<StreamAudioInfo>,
+    pub audios: Vec<AudioInfo>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -70,7 +70,7 @@ pub async fn fetch_m4s_chunk(
     Ok(stream)
 }
 
-impl StreamAudioInfo {
+impl AudioInfo {
     pub const fn data_start_offset(&self) -> usize {
         self.index_range.1
     }

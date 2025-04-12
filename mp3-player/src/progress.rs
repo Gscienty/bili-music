@@ -1,10 +1,10 @@
 use std::cmp::Ordering;
 
-use crate::{bili_api::StreamAudioInfo, demux, errors};
+use crate::{bili_api::AudioInfo, demux, errors};
 
 #[derive(Debug)]
 pub struct Progress {
-    audio: StreamAudioInfo,
+    audio: AudioInfo,
 
     metadata: demux::metadata::MP4Metadata,
 
@@ -16,7 +16,7 @@ pub struct Progress {
 }
 
 impl Progress {
-    pub async fn new(audio: &StreamAudioInfo) -> Result<Self, errors::Error> {
+    pub async fn new(audio: &AudioInfo) -> Result<Self, errors::Error> {
         let metadata = demux::metadata::MP4Metadata::parse(audio).await?;
         Ok(Self {
             audio: audio.clone(),
@@ -75,11 +75,6 @@ impl Progress {
         }
         self.should_upgrade_fragment = false;
 
-        crate::loginfo(format!(
-            "| {} / {} |",
-            self.fragment_index + 1,
-            self.metadata.get_segments().len()
-        ));
         let Some(reference) = &self.metadata.get_segments().get(self.fragment_index) else {
             self.fragment = None;
 
@@ -111,5 +106,9 @@ impl Progress {
         }
 
         Some((sample, data))
+    }
+
+    pub const fn sample_rate(&self) -> u32 {
+        self.metadata.sample_rate()
     }
 }
