@@ -7,10 +7,13 @@
   <body>
     <button id="btn">play</button>
     <script type="module">
-      import init, { run } from "./pkg/mp3_player.js";
+      import init, { run } from "./pkg/player.js";
       init().then(async () => {
         document.getElementById("btn").addEventListener("click", async function() {
-          await run("BV1AQ4y1m7Uo");
+          await run(JSON.stringify([
+            "BV1oJ4m1h7xY",
+            "BV1Wt41147qp",
+          ]));
         });
       });
     </script>
