@@ -13,7 +13,6 @@ use wasm_bindgen::{JsCast, prelude::Closure};
 use web_sys::{AudioBuffer, AudioBufferOptions, AudioContext, GainNode, GainOptions};
 
 enum AudioPlayerEvent {
-    ResetProgress(u64),
     DownloadedFragment(usize),
     Suspend,
 }
@@ -33,15 +32,18 @@ struct AudioPlayerMetadata {
     metadata: demux::metadata::MP4Metadata,
 }
 
+type CacheType = Arc<RwLock<HashMap<usize, Vec<SampleBuffer<f32>>>>>;
+
 pub struct AudioPlayer {
     ctx: AudioContext,
     metadata: Option<Arc<AudioPlayerMetadata>>,
 
-    cache: Arc<RwLock<HashMap<usize, Vec<SampleBuffer<f32>>>>>,
+    cache: CacheType,
 
     play_fragment_cursor: usize,
     play_sample_cursor: usize,
     suspend: bool,
+    is_loop: bool,
 
     send: UnboundedSender<AudioPlayerEvent>,
     recv: UnboundedReceiver<AudioPlayerEvent>,
@@ -61,6 +63,7 @@ impl AudioPlayer {
             play_fragment_cursor: 0,
             play_sample_cursor: 0,
             suspend: true,
+            is_loop: false,
 
             send,
             recv,
@@ -81,6 +84,10 @@ impl AudioPlayer {
         self.suspend = true;
 
         Ok(())
+    }
+
+    pub fn set_loop(&mut self, is_loop: bool) {
+        self.is_loop = is_loop;
     }
 
     pub async fn start(&mut self) {
@@ -107,41 +114,61 @@ impl AudioPlayer {
             )
             .await;
         });
-        let _ = fragment_downloader_send.send(AudioFragmentDownloaderEvent::DownloadFragment(
-            DownloadFragmentEvent {
-                metadata: metadata.clone(),
-                cache: self.cache.clone(),
-                index: 0,
-            },
-        ));
+        self.send_download_fragment(&fragment_downloader_send, 0)
+            .await;
 
         while let Some(event) = self.recv.recv().await {
-            match event {
-                AudioPlayerEvent::Suspend => {
-                    if self.on_suspend(&fragment_downloader_send).await {
-                        break;
-                    }
-                }
-                AudioPlayerEvent::ResetProgress(time_endpoint) => {
-                    crate::loginfo(format!("reset progress {}", time_endpoint));
-                }
+            let stop = match event {
+                AudioPlayerEvent::Suspend => self.on_suspend(&fragment_downloader_send).await,
                 AudioPlayerEvent::DownloadedFragment(fragment_index) => {
-                    if self.suspend
-                        && self.play_fragment_cursor == fragment_index
-                        && self.on_suspend(&fragment_downloader_send).await
-                    {
-                        break;
+                    self.send_download_fragment(&fragment_downloader_send, fragment_index + 1)
+                        .await;
+
+                    if self.suspend && self.play_fragment_cursor == fragment_index {
+                        crate::loginfo("occur KA".to_string());
+                        self.on_suspend(&fragment_downloader_send).await
+                    } else {
+                        false
                     }
                 }
+            };
+
+            if stop {
+                if self.is_loop {
+                    self.play_sample_cursor = 0;
+                    self.play_fragment_cursor = 0;
+                    let _ = self.send.send(AudioPlayerEvent::Suspend);
+                    crate::loginfo("done".to_string());
+                    continue;
+                }
+                break;
             }
         }
+    }
+
+    async fn send_download_fragment(
+        &self,
+        fragment_downloader_send: &UnboundedSender<AudioFragmentDownloaderEvent>,
+        index: usize,
+    ) {
+        let Some(metadata) = self.metadata.clone() else {
+            return;
+        };
+
+        let _ = fragment_downloader_send.send(AudioFragmentDownloaderEvent::DownloadFragment(
+            DownloadFragmentEvent {
+                metadata,
+                cache: self.cache.clone(),
+                index,
+            },
+        ));
     }
 
     async fn on_suspend(
         &mut self,
         fragment_downloader_send: &UnboundedSender<AudioFragmentDownloaderEvent>,
     ) -> bool {
-        let Some(metadata) = self.metadata.clone() else {
+        let Some(metadata) = self.metadata.as_ref() else {
             self.suspend = true;
             return false;
         };
@@ -149,15 +176,10 @@ impl AudioPlayer {
             return true;
         }
 
-        let Some(audio_buffer) = self.load_samples(3).await else {
+        let Some(audio_buffer) = self.load_samples(50).await else {
             self.suspend = true;
-            let _ = fragment_downloader_send.send(AudioFragmentDownloaderEvent::DownloadFragment(
-                DownloadFragmentEvent {
-                    metadata,
-                    cache: self.cache.clone(),
-                    index: self.play_fragment_cursor,
-                },
-            ));
+            self.send_download_fragment(fragment_downloader_send, self.play_fragment_cursor)
+                .await;
             return false;
         };
 
@@ -192,7 +214,7 @@ impl AudioPlayer {
         let mut right_samples = Vec::new();
         for _ in 0..count {
             if self.play_fragment_cursor >= metadata.metadata.get_segments().len() {
-                return None;
+                break;
             }
             let Some(samples) = cache.get(&self.play_fragment_cursor) else {
                 break;
@@ -200,6 +222,12 @@ impl AudioPlayer {
             let Some(sample) = samples.get(self.play_sample_cursor) else {
                 self.play_fragment_cursor += 1;
                 self.play_sample_cursor = 0;
+
+                crate::loginfo(format!(
+                    "| incr frag {} {} |",
+                    self.play_fragment_cursor,
+                    metadata.metadata.get_segments().len()
+                ));
                 continue;
             };
             for (index, &sample) in sample.samples().iter().enumerate() {
@@ -236,12 +264,12 @@ impl AudioPlayer {
         while let Some(event) = recv.recv().await {
             match event {
                 AudioFragmentDownloaderEvent::DownloadFragment(event) => {
-                    for _ in 0..5 {
+                    for offset in 0..10 {
                         let Some(index) = Self::download_fragment(
                             &mut decoder,
                             &event.metadata,
                             &event.cache,
-                            event.index,
+                            event.index + offset,
                         )
                         .await
                         else {
@@ -257,13 +285,13 @@ impl AudioPlayer {
     async fn download_fragment(
         decoder: &mut symphonia_codec_aac::AacDecoder,
         metadata: &AudioPlayerMetadata,
-        cache: &Arc<RwLock<HashMap<usize, Vec<SampleBuffer<f32>>>>>,
+        cache: &CacheType,
         mut index: usize,
     ) -> Option<usize> {
         let index = ({
             let mut download_fragment_index = None;
-            let cache = cache.read().await;
             while index < metadata.metadata.get_segments().len() {
+                let cache = cache.read().await;
                 if !cache.contains_key(&index) {
                     download_fragment_index = Some(index);
                     break;
