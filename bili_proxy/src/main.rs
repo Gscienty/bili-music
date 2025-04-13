@@ -11,8 +11,8 @@ async fn main() {
     let app = Router::new()
         .route("/audio_info/{bvid}", axum::routing::get(get_audio_info))
         .route("/audio_chunk", axum::routing::post(m4s_chunk::m4s_chunk))
-        .route_service("/", ServeFile::new("../mp3-player/index.html"))
-        .nest_service("/pkg", ServeDir::new("../mp3-player/pkg"));
+        .route_service("/", ServeFile::new("../player/index.html"))
+        .nest_service("/pkg", ServeDir::new("../player/pkg"));
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8000")
         .await

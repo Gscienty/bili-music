@@ -1,5 +1,5 @@
 [package]
-name = "mp3-player"
+name = "player"
 version = "0.1.0"
 edition = "2024"
 
@@ -16,7 +16,25 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 tokio = { version = "1.43.0", features = ["sync", "rt"] }
 async-trait = "0.1.86"
 chrono = "0.4.39"
-web-sys = { version = "0.3.77", features = ["Headers", "Request", "RequestInit", "RequestMode", "Response", "Window", "Document", "Element", "HtmlAnchorElement", "AudioContext", "AudioDecoder", "GainNode", "GainOptions", "AudioBuffer", "AudioBufferOptions", "AudioBufferSourceNode", "AudioDestinationNode"] }
+web-sys = { version = "0.3.77", features = [
+  "Headers",
+  "Request",
+  "RequestInit",
+  "RequestMode",
+  "Response",
+  "Window",
+  "Document",
+  "Element",
+  "HtmlAnchorElement",
+  "AudioContext",
+  "AudioDecoder",
+  "GainNode",
+  "GainOptions",
+  "AudioBuffer",
+  "AudioBufferOptions",
+  "AudioBufferSourceNode",
+  "AudioDestinationNode",
+] }
 wasm-bindgen-futures = "0.4.50"
 tokio_with_wasm = { version = "0.8.2", features = [
   "rt",

@@ -1,10 +1,4 @@
 use player::AudioPlayer;
-use symphonia_core::{
-    audio::{Channels, SampleBuffer},
-    codecs::{CODEC_TYPE_AAC, CodecParameters, Decoder, DecoderOptions},
-    formats::Packet,
-};
-use web_sys::{AudioBuffer, AudioBufferOptions, AudioContext, GainNode, GainOptions};
 
 mod bili_api;
 #[allow(unused)]
